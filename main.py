@@ -54,14 +54,17 @@ class Gate:
 
         # Calculate offset between car and gate
         offset = (int(self.x - car.x), int(self.y - car.y))
+        offset2 = (int(self.y - car.y), int(self.x - car.x))
 
         # Check if masks collide
-        if car_mask.overlap(gate_mask, offset):
+        if car_mask.overlap(gate_mask, offset) or car_mask.overlap(gate_mask, offset2):
 
             # If car passed through the gate for the first time, increase its fitness
             if self.id not in car.passed_gates:
-                ge[x].fitness += 100
+                car.number_of_gates_passed += 1
+                ge[x].fitness += 50*car.number_of_gates_passed
                 car.passed_gates.append(self.id)
+
 
     def draw(self, win):
         pygame.draw.rect(win, (255, 0, 0), self.rect)
@@ -105,6 +108,7 @@ class AbstractCar:
         self.angle = 0
         self.width = 20
         self.height = 10
+        self.number_of_gates_passed = 0
         self.passed_gates = []
         self.x, self.y = START
         self.acceleration = 0.1
@@ -145,7 +149,7 @@ class AbstractCar:
         self.angle = 0
         self.vel = 0
 
-    def distance_to_wall(self, mask, max_distance=200, angles=[0]):
+    def distance_to_wall(self, mask, max_distance=20, angles=[0]):
         """
         Returns a list of distances to the nearest wall in front of the car for each angle in `angles`.
         If there is no wall within `max_distance`, it returns `max_distance`.
@@ -299,7 +303,6 @@ def handle_collision(cars, player_car, game_info, time_survived):
         if car.collide(TRACK_BORDER_MASK) != None:
             car.bounce()
             ge[x].fitness -= 1000/time_survived
-            #print(1000/time_survived)
             cars.pop(x)
             ge.pop(x)
             nets.pop(x)
@@ -328,20 +331,16 @@ def main(genomes, config):
     global counter
     global counter_max
     time_survived = 0
-    if counter_max < 300:
+    if counter_max < 400:
         counter_max += 10
     counter = counter_max
     run = True
     clock = pygame.time.Clock()
     images = [(GRASS, (0, 0)), (TRACK, (0, 0)),
               (FINISH, FINISH_POSITION), (TRACK_BORDER, (0, 0))]
-    dist = random.choice([(180,200),(720,130),(720,430), (400, 650)])
-    #dist = (180,200)
+    dist = random.choice([(180,200),(720,100),(720,460), (400, 650)])
+    #dist = (400,310)
     player_car = PlayerCar(6, 4, START = dist)
-    #180,200
-    #720,130
-    #720, 430
-    #400,600
 
     #computer_car = ComputerCar(2, 4,random.choice([(180,200),(720,130),(720,430), (400, 600)]), PATH)
     game_info = GameInfo()
@@ -349,7 +348,7 @@ def main(genomes, config):
     for _, g in genomes:
         net = neat.nn.FeedForwardNetwork.create(g, config)
         nets.append(net)
-        cars.append(PlayerCar(max_vel= 2, rotation_vel=6, START=  dist))
+        cars.append(PlayerCar(max_vel= 2, rotation_vel=8, START=  dist))
         g.fitness = 0
         ge.append(g)
     while run:
@@ -359,7 +358,6 @@ def main(genomes, config):
         if len(cars) == 0:
             run = False
             break
-
         draw(WIN, images, gates, cars, player_car, game_info)
         while not game_info.started:
             #blit_text_center(
@@ -380,14 +378,23 @@ def main(genomes, config):
         #print(player_car.distance_to_wall(TRACK_BORDER_MASK, angles=[0, 45, 90, 135, 180]))
         for x, car in enumerate(cars):
             car.move()
+            if len(car.passed_gates) != 0:
+                cur = max(car.passed_gates)
+                if cur == 39:
+                    cur = 1
+                for gate in gates[cur:cur+1]:
+                    gate.check_collision(car, x)
+            else:
+                for gate in gates:
+                    gate.check_collision(car, x)
+                #print(max(car.passed_gates))
             #if time_survived < 5000:
                 #for gate in gates[0:15]:
                    # gate.check_collision(car, x)
             #else:
-            for gate in gates:
-                gate.check_collision(car, x)
 
-            distances = car.distance_to_wall(TRACK_BORDER_MASK, angles=[0, 45, 90, 135, 180])
+
+            distances = car.distance_to_wall(TRACK_BORDER_MASK, angles=[30, 60, 90, 120, 150])
             #print(distances)
             distances.append(car.vel)
             distances.append(car.rotation_vel)
@@ -410,9 +417,9 @@ def main(genomes, config):
             if output[2] > 0.5:
                 car.rotate(left=True, right=False)
 
-            if output[2] > 0.5:
-                car.move_backward()
-                ge[x].fitness -= 0.5
+            #if output[2] > 0.5:
+             #   car.move_backward()
+              #  ge[x].fitness -= 0.5
 
             if counter <= 0:
                 ge.pop(x)
@@ -442,13 +449,13 @@ def run(config_path):
     winner = p.run(main)
 
 if __name__ == "__main__":
-    gates.append(Gate(x=120, y=20, width=20, height=100, id = 1))
-    gates.append(Gate(x=140, y=100, width=100, height=20, id = 2))
+    gates.append(Gate(x=140, y=190, width=100, height=20, id = 1))
+    gates.append(Gate(x=120, y=20, width=20, height=100, id = 2))
     gates.append(Gate(x=20, y=100, width=100, height=20, id = 3))
     gates.append(Gate(x=20, y=200, width=100, height=20, id=4))
     gates.append(Gate(x=20, y=300, width=100, height=20, id=5))
     gates.append(Gate(x=20, y=400, width=100, height=20, id=6))
-    gates.append(Gate(x=50, y=500, width=100, height=20, id=7))
+    gates.append(Gate(x=80, y=530, width=100, height=20, id=7))
     gates.append(Gate(x=130, y=600, width=100, height=20, id=8))
     gates.append(Gate(x=210, y=670, width=100, height=20, id=9))
     gates.append(Gate(x=350, y=680, width=20, height=100, id=10))
@@ -480,8 +487,8 @@ if __name__ == "__main__":
     gates.append(Gate(x=230, y=220, width=100, height=20, id=36))
     gates.append(Gate(x=230, y=320, width=100, height=20, id=37))
     gates.append(Gate(x=230, y=350, width=20, height=100, id=38))
-    gates.append(Gate(x=130, y=320, width=100, height=20, id=39))
-    gates.append(Gate(x=120, y=150, width=100, height=20, id=40))
+    gates.append(Gate(x=100, y=320, width=100, height=20, id=39))
+
 
     local_dir = os.path.dirname(__file__)
     config_path = os.path.join(local_dir, "config")
