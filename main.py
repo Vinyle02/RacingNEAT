@@ -38,7 +38,7 @@ PATH = [(175, 119), (110, 70), (56, 133), (70, 481), (318, 731), (404, 680), (41
         (734, 399), (611, 357), (409, 343), (433, 257), (697, 258), (738, 123), (581, 71), (303, 78), (275, 377), (176, 388), (178, 260)]
 
 class Gate:
-    def __init__(self, x, y, width, height, id):
+    def __init__(self, x, y, width, height):
         self.rect = pygame.Rect(x, y, width, height)
         self.x = x
         self.y = y
@@ -64,6 +64,7 @@ class Gate:
                 car.number_of_gates_passed += 1
                 ge[x].fitness += 50*car.number_of_gates_passed
                 car.passed_gates.append(self.id)
+                car.distance_to_gate = 1000
 
 
     def draw(self, win):
@@ -112,6 +113,7 @@ class AbstractCar:
         self.passed_gates = []
         self.x, self.y = START
         self.acceleration = 0.1
+        self.distance_to_gate = 10000
 
     def rotate(self, left=False, right=False):
         if left:
@@ -302,7 +304,7 @@ def handle_collision(cars, player_car, game_info, time_survived):
     for x, car in enumerate(cars):
         if car.collide(TRACK_BORDER_MASK) != None:
             car.bounce()
-            ge[x].fitness -= 1000/time_survived
+            ge[x].fitness -= 10
             cars.pop(x)
             ge.pop(x)
             nets.pop(x)
@@ -339,7 +341,8 @@ def main(genomes, config):
     images = [(GRASS, (0, 0)), (TRACK, (0, 0)),
               (FINISH, FINISH_POSITION), (TRACK_BORDER, (0, 0))]
     dist = random.choice([(180,200),(720,100),(720,460), (400, 650)])
-    #dist = (400,310)
+    #dist = random.choice([(720, 100), (400, 650)])
+    #dist = (180,200)
     player_car = PlayerCar(6, 4, START = dist)
 
     #computer_car = ComputerCar(2, 4,random.choice([(180,200),(720,130),(720,430), (400, 600)]), PATH)
@@ -380,10 +383,12 @@ def main(genomes, config):
             car.move()
             if len(car.passed_gates) != 0:
                 cur = max(car.passed_gates)
-                if cur == 39:
-                    cur = 1
+                if cur == len(gates):
+                    cur = 0
                 for gate in gates[cur:cur+1]:
                     gate.check_collision(car, x)
+
+
             else:
                 for gate in gates:
                     gate.check_collision(car, x)
@@ -402,10 +407,10 @@ def main(genomes, config):
 
             #if car.vel > 1.5:
                 #ge[x].fitness += car.vel**2/4
-            distance_traveled = 0
-            if time_survived % 30 == 0:
-                distance_traveled += distance_traveled
-                ge[x].fitness += 25*car.vel
+            #distance_traveled = 0
+            #if time_survived % 30 == 0:
+                #distance_traveled += distance_traveled
+                #ge[x].fitness += 25*car.vel
 
             if output[0] > 0.05:
                 car.move_forward()
@@ -417,6 +422,8 @@ def main(genomes, config):
             if output[2] > 0.5:
                 car.rotate(left=True, right=False)
 
+            #if output[0] > 0.05 and output[2] < 0.5 and output[1] < 0.5:
+             #   ge[x].fitness += 1
             #if output[2] > 0.5:
              #   car.move_backward()
               #  ge[x].fitness -= 0.5
@@ -449,45 +456,48 @@ def run(config_path):
     winner = p.run(main)
 
 if __name__ == "__main__":
-    gates.append(Gate(x=140, y=190, width=100, height=20, id = 1))
-    gates.append(Gate(x=120, y=20, width=20, height=100, id = 2))
-    gates.append(Gate(x=20, y=100, width=100, height=20, id = 3))
-    gates.append(Gate(x=20, y=200, width=100, height=20, id=4))
-    gates.append(Gate(x=20, y=300, width=100, height=20, id=5))
-    gates.append(Gate(x=20, y=400, width=100, height=20, id=6))
-    gates.append(Gate(x=80, y=530, width=100, height=20, id=7))
-    gates.append(Gate(x=130, y=600, width=100, height=20, id=8))
-    gates.append(Gate(x=210, y=670, width=100, height=20, id=9))
-    gates.append(Gate(x=350, y=680, width=20, height=100, id=10))
-    gates.append(Gate(x=350, y=690, width=100, height=20, id=11))
-    gates.append(Gate(x=350, y=600, width=100, height=20, id=12))
-    gates.append(Gate(x=390, y=500, width=100, height=20, id=13))
-    gates.append(Gate(x=500, y=440, width=20, height=100, id=14))
-    gates.append(Gate(x=520, y=500, width=100, height=20, id=15))
-    gates.append(Gate(x=550, y=600, width=100, height=20, id=16))
-    gates.append(Gate(x=650, y=670, width=20, height=100, id=17))
-    gates.append(Gate(x=680, y=670, width=100, height=20, id=18))
-    gates.append(Gate(x=680, y=570, width=100, height=20, id=19))
-    gates.append(Gate(x=680, y=470, width=100, height=20, id=20))
-    gates.append(Gate(x=680, y=370, width=100, height=20, id=21))
-    gates.append(Gate(x=680, y=330, width=20, height=100, id=22))
-    gates.append(Gate(x=580, y=330, width=20, height=100, id=23))
-    gates.append(Gate(x=480, y=330, width=20, height=100, id=24))
-    gates.append(Gate(x=360, y=300, width=100, height=20, id=25))
-    gates.append(Gate(x=480, y=210, width=20, height=100, id=26))
-    gates.append(Gate(x=580, y=210, width=20, height=100, id=27))
-    gates.append(Gate(x=680, y=210, width=20, height=100, id=28))
-    gates.append(Gate(x=680, y=210, width=100, height=20, id=29))
-    gates.append(Gate(x=680, y=110, width=100, height=20, id=30))
-    gates.append(Gate(x=680, y=20, width=20, height=100, id=31))
-    gates.append(Gate(x=580, y=20, width=20, height=100, id=32))
-    gates.append(Gate(x=480, y=20, width=20, height=100, id=33))
-    gates.append(Gate(x=380, y=20, width=20, height=100, id=34))
-    gates.append(Gate(x=230, y=120, width=100, height=20, id=35))
-    gates.append(Gate(x=230, y=220, width=100, height=20, id=36))
-    gates.append(Gate(x=230, y=320, width=100, height=20, id=37))
-    gates.append(Gate(x=230, y=350, width=20, height=100, id=38))
-    gates.append(Gate(x=100, y=320, width=100, height=20, id=39))
+    gates.append(Gate(x=140, y=190, width=100, height=20))
+    gates.append(Gate(x=120, y=20, width=20, height=100))
+    gates.append(Gate(x=20, y=100, width=100, height=20))
+    gates.append(Gate(x=20, y=200, width=100, height=20))
+    gates.append(Gate(x=20, y=300, width=100, height=20))
+    gates.append(Gate(x=20, y=400, width=100, height=20))
+    gates.append(Gate(x=80, y=530, width=100, height=20))
+    gates.append(Gate(x=130, y=600, width=100, height=20))
+    gates.append(Gate(x=210, y=670, width=100, height=20))
+    gates.append(Gate(x=350, y=680, width=20, height=100))
+    gates.append(Gate(x=350, y=690, width=100, height=20))
+    gates.append(Gate(x=350, y=600, width=100, height=20))
+    gates.append(Gate(x=390, y=500, width=100, height=20))
+    gates.append(Gate(x=500, y=440, width=20, height=100))
+    gates.append(Gate(x=520, y=500, width=100, height=20))
+    gates.append(Gate(x=550, y=600, width=100, height=20))
+    gates.append(Gate(x=650, y=670, width=20, height=100))
+    gates.append(Gate(x=680, y=670, width=100, height=20))
+    gates.append(Gate(x=680, y=570, width=100, height=20))
+    gates.append(Gate(x=680, y=470, width=100, height=20))
+    gates.append(Gate(x=680, y=370, width=100, height=20))
+    gates.append(Gate(x=680, y=330, width=20, height=100))
+    gates.append(Gate(x=580, y=330, width=20, height=100))
+    gates.append(Gate(x=480, y=330, width=20, height=100))
+    gates.append(Gate(x=360, y=300, width=100, height=20))
+    gates.append(Gate(x=480, y=210, width=20, height=100))
+    gates.append(Gate(x=580, y=210, width=20, height=100))
+    gates.append(Gate(x=680, y=210, width=20, height=100))
+    gates.append(Gate(x=680, y=210, width=100, height=20))
+    gates.append(Gate(x=680, y=110, width=100, height=20))
+    gates.append(Gate(x=680, y=20, width=20, height=100))
+    gates.append(Gate(x=580, y=20, width=20, height=100))
+    gates.append(Gate(x=480, y=20, width=20, height=100))
+    gates.append(Gate(x=380, y=20, width=20, height=100))
+    gates.append(Gate(x=230, y=120, width=100, height=20))
+    gates.append(Gate(x=230, y=220, width=100, height=20))
+    gates.append(Gate(x=230, y=320, width=100, height=20))
+    gates.append(Gate(x=230, y=350, width=20, height=100))
+    gates.append(Gate(x=100, y=320, width=100, height=20))
+
+    for x, gate in enumerate(gates):
+        gate.id = x
 
 
     local_dir = os.path.dirname(__file__)
