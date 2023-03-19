@@ -1,9 +1,12 @@
+import copy
+
 import pygame
 import time
 import math
 import neat
 import os
 import random
+import pickle
 from utils import scale_image, blit_rotate_center, blit_text_center
 pygame.font.init()
 
@@ -26,6 +29,7 @@ nets = []
 gates = []
 counter = 0
 counter_max = 75
+winner = 0
 
 WIDTH, HEIGHT = TRACK.get_width(), TRACK.get_height()
 WIN = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -36,6 +40,7 @@ MAIN_FONT = pygame.font.SysFont("comicsans", 44)
 FPS = 60
 PATH = [(175, 119), (110, 70), (56, 133), (70, 481), (318, 731), (404, 680), (418, 521), (507, 475), (600, 551), (613, 715), (736, 713),
         (734, 399), (611, 357), (409, 343), (433, 257), (697, 258), (738, 123), (581, 71), (303, 78), (275, 377), (176, 388), (178, 260)]
+
 
 class Gate:
     def __init__(self, x, y, width, height):
@@ -62,7 +67,7 @@ class Gate:
             # If car passed through the gate for the first time, increase its fitness
             if self.id not in car.passed_gates:
                 car.number_of_gates_passed += 1
-                ge[x].fitness += 50*car.number_of_gates_passed
+                ge[x].fitness += 100
                 car.passed_gates.append(self.id)
                 car.distance_to_gate = 1000
 
@@ -101,14 +106,14 @@ class GameInfo:
 
 
 class AbstractCar:
-    def __init__(self, max_vel, rotation_vel, START):
+    def __init__(self, max_vel, rotation_vel, START, rotated = False):
         self.img = self.IMG
         self.max_vel = max_vel
         self.vel = 0
         self.rotation_vel = rotation_vel
         self.angle = 0
-        self.width = 20
-        self.height = 10
+        self.width = 2
+        self.height = 1
         self.number_of_gates_passed = 0
         self.passed_gates = []
         self.x, self.y = START
@@ -122,7 +127,7 @@ class AbstractCar:
             self.angle -= self.rotation_vel
 
     def draw(self, win):
-        blit_rotate_center(win, self.img, (self.x, self.y), self.angle)
+        blit_rotate_center(win, self.img, (self.x-10, self.y-20), self.angle)
 
     def move_forward(self):
         self.vel = min(self.vel + self.acceleration, self.max_vel)
@@ -142,7 +147,7 @@ class AbstractCar:
 
     def collide(self, mask, x=0, y=0):
         car_mask = pygame.mask.from_surface(self.img)
-        offset = (int(self.x - x), int(self.y - y))
+        offset = (int(self.x - x-10), int(self.y - y-20))
         poi = mask.overlap(car_mask, offset)
         return poi
 
@@ -150,6 +155,8 @@ class AbstractCar:
         self.x, self.y = self.START_POS
         self.angle = 0
         self.vel = 0
+
+    import pygame
 
     def distance_to_wall(self, mask, max_distance=20, angles=[0]):
         """
@@ -171,6 +178,10 @@ class AbstractCar:
                 poi = mask.get_at((int(x), int(y)))
                 if poi == 1:
                     distances.append(distance)
+                    #end_x = int(self.x + math.cos(radians) * distance)
+                    #end_y = int(self.y - math.sin(radians) * distance)
+                    #pygame.draw.line(WIN, (255, 0, 0), (int(self.x), int(self.y)), (end_x, end_y), 1)
+                    #pygame.display.update()
                     break
                 elif distance == max_distance - 1:
                     distances.append(max_distance)
@@ -179,10 +190,6 @@ class AbstractCar:
 
 class PlayerCar(AbstractCar):
     IMG = RED_CAR
-    #180,200
-    #720,130
-    #720, 430
-    #400,600
 
     def reduce_speed(self):
         self.vel = max(self.vel - self.acceleration / 2, 0)
@@ -273,8 +280,8 @@ def draw(win, images,gates,cars, player_car, game_info):
     for car in cars:
         car.draw(win)
     player_car.draw(win)
-    for gate in gates:
-        gate.draw(win)
+    #for gate in gates:
+        #gate.draw(win)
     #computer_car.draw(win)
     pygame.display.update()
 
@@ -299,13 +306,16 @@ def move_player(player_car):
 
 
 def handle_collision(cars, player_car, game_info, time_survived):
+    global winner
     if player_car.collide(TRACK_BORDER_MASK) != None:
         player_car.bounce()
     for x, car in enumerate(cars):
         if car.collide(TRACK_BORDER_MASK) != None:
             car.bounce()
-            ge[x].fitness -= 10
+            ge[x].fitness -= 1000/time_survived
             cars.pop(x)
+            if ge[x].fitness > winner.fitness:
+                winner = ge[x]
             ge.pop(x)
             nets.pop(x)
 
@@ -332,6 +342,7 @@ def handle_collision(cars, player_car, game_info, time_survived):
 def main(genomes, config):
     global counter
     global counter_max
+    global winner
     time_survived = 0
     if counter_max < 400:
         counter_max += 10
@@ -340,20 +351,24 @@ def main(genomes, config):
     clock = pygame.time.Clock()
     images = [(GRASS, (0, 0)), (TRACK, (0, 0)),
               (FINISH, FINISH_POSITION), (TRACK_BORDER, (0, 0))]
-    dist = random.choice([(180,200),(720,100),(720,460), (400, 650)])
+    dist = random.choice([(180,200),(720,100),(720,460), (400, 690)])
     #dist = random.choice([(720, 100), (400, 650)])
     #dist = (180,200)
     player_car = PlayerCar(6, 4, START = dist)
 
     #computer_car = ComputerCar(2, 4,random.choice([(180,200),(720,130),(720,430), (400, 600)]), PATH)
     game_info = GameInfo()
-
     for _, g in genomes:
         net = neat.nn.FeedForwardNetwork.create(g, config)
         nets.append(net)
         cars.append(PlayerCar(max_vel= 2, rotation_vel=8, START=  dist))
         g.fitness = 0
         ge.append(g)
+
+    if winner == 0:
+        winner = genomes[0][1]
+    else:
+        print(winner.fitness)
     while run:
         clock.tick(FPS)
         counter -= 1
@@ -383,27 +398,24 @@ def main(genomes, config):
             car.move()
             if len(car.passed_gates) != 0:
                 cur = max(car.passed_gates)
-                if cur == len(gates):
-                    cur = 0
-                for gate in gates[cur:cur+1]:
-                    gate.check_collision(car, x)
+                if cur == len(gates)-1:
+                    print(cur)
+                    cur = -1
+                    print(cur)
+                    car.passed_gates = [-1]
+                for gate in gates[cur+1:cur+2]:
 
+                    gate.check_collision(car, x)
 
             else:
                 for gate in gates:
                     gate.check_collision(car, x)
-                #print(max(car.passed_gates))
-            #if time_survived < 5000:
-                #for gate in gates[0:15]:
-                   # gate.check_collision(car, x)
-            #else:
 
-
-            distances = car.distance_to_wall(TRACK_BORDER_MASK, angles=[30, 60, 90, 120, 150])
+            inputs = car.distance_to_wall(TRACK_BORDER_MASK, angles=[0, 45, 90, 135, 180])
             #print(distances)
-            distances.append(car.vel)
-            distances.append(car.rotation_vel)
-            output = nets[x].activate(distances)
+            #distances.append(car.vel)
+            #distances.append(car.rotation_vel)
+            output = nets[x].activate(inputs)
 
             #if car.vel > 1.5:
                 #ge[x].fitness += car.vel**2/4
@@ -412,26 +424,32 @@ def main(genomes, config):
                 #distance_traveled += distance_traveled
                 #ge[x].fitness += 25*car.vel
 
-            if output[0] > 0.05:
-                car.move_forward()
+            #if output[0] > 0.05:
+             #   car.move_forward()
                 #ge[x].fitness += 1
+            car.move_forward()
+            ge[x].fitness += 1
 
-            if output[1] > 0.5:
+            i = output.index(max(output))
+            if i == 0:
                 car.rotate(left=False, right=True)
-
-            if output[2] > 0.5:
+                ge[x].fitness -= 0.5
+            elif i == 1:
                 car.rotate(left=True, right=False)
+                ge[x].fitness -= 0.5
 
-            #if output[0] > 0.05 and output[2] < 0.5 and output[1] < 0.5:
-             #   ge[x].fitness += 1
-            #if output[2] > 0.5:
-             #   car.move_backward()
-              #  ge[x].fitness -= 0.5
 
-            if counter <= 0:
-                ge.pop(x)
-                cars.pop(x)
-                nets.pop(x)
+
+
+
+
+            #if counter <= 0:
+              #  if ge[x].fitness > winner.fitness:
+             #       winner = ge[x]
+             #   ge.pop(x)
+
+             #   cars.pop(x)
+             #   nets.pop(x)
 
         move_player(player_car)
         #computer_car.move()
@@ -446,14 +464,19 @@ def main(genomes, config):
            # computer_car.reset()
 
 def run(config_path):
+    global winner
     config = neat.config.Config(neat.DefaultGenome, neat.DefaultReproduction, neat.DefaultSpeciesSet, neat.DefaultStagnation, config_path)
-
+    #p = neat.Checkpointer.restore_checkpoint('neat-checkpoint-14')
     p = neat.Population(config)
-
     p.add_reporter(neat.StdOutReporter(True))
     stats = neat.StatisticsReporter()
     p.add_reporter(stats)
+    p.add_reporter(neat.Checkpointer(1))
+
     winner = p.run(main)
+    with open("best.pickle", "wb") as f:
+        pickle.dump(winner, f)
+
 
 if __name__ == "__main__":
     gates.append(Gate(x=140, y=190, width=100, height=20))
@@ -500,9 +523,13 @@ if __name__ == "__main__":
         gate.id = x
 
 
+
     local_dir = os.path.dirname(__file__)
     config_path = os.path.join(local_dir, "config")
     run(config_path)
+
+    with open("best.pickle", "rb") as f:
+        winner = pickle.load(f)
 
 
 pygame.quit()
